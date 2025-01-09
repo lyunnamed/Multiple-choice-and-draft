@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drawing Quiz</title>
+    <style>
+        .question-container {
+            margin: 20px;
+        }
+        
+        .options {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        .option-btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        #canvas {
+            border: 1px solid #ccc;
+            margin: 20px;
+        }
+        
+        .color-palette {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .color-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .color-btn.selected {
+            transform: scale(1.2);
+            box-shadow: 0 0 8px rgba(0,0,0,0.3);
+            border: 2px solid white;
+        }
+        
+        .eraser {
+            background-color: transparent !important;
+            border: 1px solid #ccc !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+        }
+
+        .tool-btn#eraser-tool {
+            padding: 5px 10px;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+            background-color: #ff4444 !important;
+            color: white !important;
+            border: none;
+        }
+
+        .tool-btn#eraser-tool.active {
+            transform: scale(1.2);
+            box-shadow: 0 0 8px rgba(0,0,0,0.3);
+            background-color: #ff4444 !important;
+        }
+
+        .tool-btn {
+            padding: 5px 10px;
+            background: transparent;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+
+        .thickness-control {
+            position: fixed;
+            top: 60px;
+            right: 20px;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #thickness-preview {
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="question-container">
+        <h3>Question 1: What is your favorite color?</h3>
+        <div class="options">
+            <button class="option-btn">A. Red</button>
+            <button class="option-btn">B. Blue</button>
+            <button class="option-btn">C. Green</button>
+            <button class="option-btn">D. Yellow</button>
+        </div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <div class="color-palette">
+        <button class="tool-btn" id="line-tool">━</button>
+        <button class="color-btn eraser">⌫</button>
+        <button class="color-btn" style="background-color: #ccc;"></button>
+        <button class="color-btn" style="background-color: red;"></button>
+        <button class="color-btn" style="background-color: blue;"></button>
+        <button class="color-btn" style="background-color: green;"></button>
+        <button class="color-btn" style="background-color: yellow;"></button>
+        <button class="color-btn" style="background-color: black;"></button>
+        <button class="tool-btn" id="eraser-tool" style="background-color: #ff4444; color: white;">⌫</button>
+    </div>
+
+    <div class="thickness-control">
+        <label for="thickness">Line Width:</label>
+        <input type="range" id="thickness" min="1" max="20" value="2">
+        <span id="thickness-value">2px</span>
+        <canvas id="thickness-preview" width="30" height="30"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+        let currentColor = 'black';
+        let currentTool = 'freehand';
+        let lineWidth = 2;
+        let startX, startY;
+        let lastDrawnLine = null;
+        let previousColor = 'black';
+        let isErasing = false;
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth - 40;
+            canvas.height = window.innerHeight - 200;
+        }
+        
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Drawing functionality
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseout', stopDrawing);
+
+        function startDrawing(e) {
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            startX = e.clientX - rect.left;
+            startY = e.clientY - rect.top;
+
+            if (currentTool === 'freehand') {
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+            } else if (currentTool === 'line') {
+                lastDrawnLine = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            }
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const currentX = e.clientX - rect.left;
+            const currentY = e.clientY - rect.top;
+
+            if (currentTool === 'line') {
+                if (lastDrawnLine) {
+                    ctx.putImageData(lastDrawnLine, 0, 0);
+                }
+
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(currentX, currentY);
+                ctx.strokeStyle = currentColor;
+                ctx.lineWidth = lineWidth;
+                ctx.stroke();
+            } else {
+                ctx.lineWidth = lineWidth;
+                ctx.lineCap = 'round';
+                ctx.lineTo(currentX, currentY);
+                
+                if (isErasing) {
+                    ctx.globalCompositeOperation = 'destination-out';
+                } else {
+                    ctx.globalCompositeOperation = 'source-over';
+                }
+                
+                ctx.strokeStyle = currentColor;
+                ctx.stroke();
+            }
+        }
+
+        function stopDrawing() {
+            if (!isDrawing) return;
+            
+            isDrawing = false;
+            lastDrawnLine = null;
+            ctx.beginPath();
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
+        // Line tool toggle
+        document.getElementById('line-tool').addEventListener('click', function() {
+            currentTool = currentTool === 'line' ? 'freehand' : 'line';
+            this.style.backgroundColor = currentTool === 'line' ? '#ddd' : 'transparent';
+            
+            // Reset eraser if active
+            if (isErasing) {
+                isErasing = false;
+                const eraserBtn = document.getElementById('eraser-tool');
+                eraserBtn.classList.remove('active');
+                currentColor = previousColor;
+                updateThicknessPreview();
+            }
+        });
+
+        // Thickness control
+        const previewCanvas = document.getElementById('thickness-preview');
+        const previewCtx = previewCanvas.getContext('2d');
+
+        function updateThicknessPreview() {
+            previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+            previewCtx.beginPath();
+            previewCtx.arc(
+                previewCanvas.width/2, 
+                previewCanvas.height/2, 
+                lineWidth/2, 
+                0, 
+                Math.PI * 2
+            );
+            if (isErasing) {
+                previewCtx.fillStyle = '#ccc';
+                previewCtx.fill();
+                previewCtx.strokeStyle = '#666';
+                previewCtx.stroke();
+            } else {
+                previewCtx.fillStyle = currentColor;
+                previewCtx.fill();
+            }
+        }
+
+        document.getElementById('thickness').addEventListener('input', function(e) {
+            lineWidth = parseInt(e.target.value);
+            document.getElementById('thickness-value').textContent = lineWidth + 'px';
+            updateThicknessPreview();
+        });
+
+        // Color palette
+        document.querySelectorAll('.color-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                if (this.classList.contains('eraser')) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                } else {
+                    // Color selection
+                    document.querySelectorAll('.color-btn').forEach(b => {
+                        b.classList.remove('selected');
+                    });
+                    this.classList.add('selected');
+                    
+                    // Disable eraser mode and reset eraser button
+                    if (isErasing) {
+                        isErasing = false;
+                        const eraserBtn = document.getElementById('eraser-tool');
+                        eraserBtn.classList.remove('active');
+                    }
+                    
+                    currentColor = window.getComputedStyle(this).backgroundColor;
+                    previousColor = currentColor;
+                    updateThicknessPreview();
+                }
+            });
+        });
+
+        // Set initial selected color
+        document.querySelector('.color-btn[style*="background-color: black"]').classList.add('selected');
+
+        // Initial preview
+        updateThicknessPreview();
+
+        // Add eraser tool functionality
+        document.getElementById('eraser-tool').addEventListener('click', function() {
+            isErasing = !isErasing;
+            this.classList.toggle('active');
+            
+            if (isErasing) {
+                previousColor = currentColor;
+                currentColor = 'white';
+                document.querySelectorAll('.color-btn').forEach(btn => {
+                    btn.classList.remove('selected');
+                });
+            } else {
+                currentColor = previousColor;
+                document.querySelectorAll('.color-btn').forEach(btn => {
+                    if (window.getComputedStyle(btn).backgroundColor === previousColor) {
+                        btn.classList.add('selected');
+                    }
+                });
+            }
+            
+            if (isErasing && currentTool === 'line') {
+                currentTool = 'freehand';
+                document.getElementById('line-tool').style.backgroundColor = 'transparent';
+            }
+            
+            updateThicknessPreview();
+        });
+
+        // Style for undo/redo buttons
+        const style = document.createElement('style');
+        style.textContent = `
+            #undo-btn, #redo-btn {
+                font-size: 20px;
+                opacity: 0.5;
+                transition: opacity 0.3s;
+            }
+            
+            .tool-btn:hover {
+                background-color: #f0f0f0;
+            }
+            
+            .tool-btn:active {
+                background-color: #e0e0e0;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Add mouseout handling to save state when leaving canvas
+        canvas.addEventListener('mouseout', function() {
+            if (isDrawing) {
+                stopDrawing();
+            }
+        });
+    </script>
+</body>
+</html>
